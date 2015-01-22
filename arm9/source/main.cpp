@@ -86,7 +86,22 @@ void backupBIOS() {
 //---------------------------------------------------------------------------------
 	clearStatus();
 
-	if (saveToFile("bios9.bin", (u8*)0xffff0000, 0x8000 ) < 0) {
+	const char *arm7file, *arm9file;
+	size_t arm7size, arm9size;
+
+	if (__dsimode) {
+		arm7file = "bios7i.bin";
+		arm7size = 64 * 1024;
+		arm9file = "bios9i.bin";
+		arm9size = 64 * 1024;
+	} else {
+		arm7file = "bios7.bin";
+		arm7size = 16 * 1024;
+		arm9file = "bios9.bin";
+		arm9size = 32 * 1024;
+	}
+
+	if (saveToFile(arm9file, (u8*)0xffff0000, arm9size ) < 0) {
 		iprintf("Error saving arm9 bios\n");
 		return;
 	}
@@ -98,12 +113,12 @@ void backupBIOS() {
 
 	fifoGetValue32(FIFO_USER_01);
 
-	if (saveToFile("bios7.bin", firmware_buffer, 0x4000) < 0 ) {
+	if (saveToFile(arm7file, firmware_buffer, arm7size) < 0 ) {
 		iprintf("Error saving arm7 bios\n");
 		return;
 	}
 
-	iprintf("BIOS saved as\n\n%1$s/bios9.bin\n%1$s/bios7.bin", dirname );
+	iprintf("BIOS saved as\n\n%1$s/%2$s\n%1$s/%3$s", dirname, arm7file, arm9file );
 
 }
 
@@ -171,6 +186,7 @@ void showMenu(menuItem menu[], int count) {
 //---------------------------------------------------------------------------------
 int main() {
 //---------------------------------------------------------------------------------
+	defaultExceptionHandler();
 
 	consoleDemoInit();
 	
@@ -178,7 +194,7 @@ int main() {
 		printf("FAT init failed!\n");
 	} else {
 
-		iprintf("Nintendo DS firmware tool 1.4\n");
+		iprintf("Nintendo DS firmware tool %s\n",VERSION);
 
 		firmware_buffer = (u8 *)memalign(32,MAX_SIZE);
 
