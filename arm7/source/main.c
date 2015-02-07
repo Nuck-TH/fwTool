@@ -1,14 +1,6 @@
 #include <nds.h>
 
 #include <nds.h>
-#include <dswifi7.h>
-#include <maxmod7.h>
-
-//---------------------------------------------------------------------------------
-void VblankHandler(void) {
-//---------------------------------------------------------------------------------
-	Wifi_Update();
-}
 
 
 //---------------------------------------------------------------------------------
@@ -32,22 +24,36 @@ static u8 readwriteSPI(u8 data) {
 }
 
 void readBios(u8 *buffer);
+void readDSiBios(u8 *buffer);
+
 
 //---------------------------------------------------------------------------------
-void dumpBios() {
+u8 *getDumpAddress() {
 //---------------------------------------------------------------------------------
 
 	while(!fifoCheckValue32(FIFO_USER_01)) {
 		swiIntrWait(1,IRQ_FIFO_NOT_EMPTY);
 	}
 
+	return (u8 *)fifoGetValue32(FIFO_USER_01);
 
-	u8 *dumped_bios = (u8 *)fifoGetValue32(FIFO_USER_01);
+}
 
-	readBios(dumped_bios);
 
+//---------------------------------------------------------------------------------
+void dumpDSiBios() {
+//---------------------------------------------------------------------------------
+	u8 *dumped_bios = getDumpAddress();
+	readDSiBios(dumped_bios);
 	fifoSendValue32(FIFO_USER_01,0);
+}
 
+//---------------------------------------------------------------------------------
+void dumpDSBios() {
+//---------------------------------------------------------------------------------
+	u8 *dumped_bios = getDumpAddress();
+	readBios(dumped_bios);
+	fifoSendValue32(FIFO_USER_01,0);
 }
 
 
@@ -78,19 +84,15 @@ int main() {
 	initClockIRQ();
 	fifoInit();
 
-	mmInstall(FIFO_MAXMOD);
-
 	SetYtrigger(80);
 
-	installWifiFIFO();
 	installSoundFIFO();
 
 	installSystemFIFO();
 
 	irqSet(IRQ_VCOUNT, VcountHandler);
-	irqSet(IRQ_VBLANK, VblankHandler);
 
-	irqEnable( IRQ_VBLANK | IRQ_VCOUNT | IRQ_NETWORK);
+	irqEnable( IRQ_VBLANK | IRQ_VCOUNT);
 	
 	setPowerButtonCB(powerButtonCB);   
 
@@ -104,7 +106,8 @@ int main() {
 			int command = fifoGetValue32(FIFO_USER_01);
 
 			if (command == 1) fifoSendValue32(FIFO_USER_01,readJEDEC());
-			if (command == 2) dumpBios();
+			if (command == 2) dumpDSBios();
+			if (command == 3) dumpDSiBios();
 		}
 
 		if ( 0 == (REG_KEYINPUT & (KEY_SELECT | KEY_START | KEY_L | KEY_R))) {

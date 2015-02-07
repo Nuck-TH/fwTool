@@ -84,6 +84,8 @@ void backupFirmware() {
 //---------------------------------------------------------------------------------
 void backupBIOS() {
 //---------------------------------------------------------------------------------
+	int dumpcmd = 0;
+
 	clearStatus();
 
 	const char *arm7file, *arm9file;
@@ -94,11 +96,13 @@ void backupBIOS() {
 		arm7size = 64 * 1024;
 		arm9file = "bios9i.bin";
 		arm9size = 64 * 1024;
+		dumpcmd = 3;
 	} else {
 		arm7file = "bios7.bin";
 		arm7size = 16 * 1024;
 		arm9file = "bios9.bin";
 		arm9size = 32 * 1024;
+		dumpcmd = 2;
 	}
 
 	if (saveToFile(arm9file, (u8*)0xffff0000, arm9size ) < 0) {
@@ -106,7 +110,7 @@ void backupBIOS() {
 		return;
 	}
 
-	fifoSendValue32(FIFO_USER_01, 2);
+	fifoSendValue32(FIFO_USER_01, dumpcmd);
 	fifoSendValue32(FIFO_USER_01, (u32)firmware_buffer);
 
 	fifoWaitValue32(FIFO_USER_01);
