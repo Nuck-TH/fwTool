@@ -21,12 +21,12 @@ all: $(TARGET).nds
 
 #---------------------------------------------------------------------------------
 $(TARGET).nds	:	arm7/$(TARGET).elf arm9/$(TARGET).elf
-	ndstool	-c $(TARGET).nds -b fwTool.bmp "Nintendo DS firmware tool;version ${VERSION}" -7 arm7/$(TARGET).elf -9 arm9/$(TARGET).elf
+	ndstool	-c $@ -b fwTool.bmp "Nintendo DS firmware tool;version ${VERSION}" -7 arm7/$(TARGET).elf -9 arm9/$(TARGET).elf
 
 #---------------------------------------------------------------------------------
 arm7/$(TARGET).elf:
 	$(MAKE) -C arm7
-	
+
 #---------------------------------------------------------------------------------
 arm9/$(TARGET).elf:
 	$(MAKE) -C arm9
