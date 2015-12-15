@@ -9,17 +9,11 @@
 
 #define MAX_SIZE	(1*1024*1024)
 
-int menuTop = 8, statusTop = 15;
-
-//---------------------------------------------------------------------------------
-void fifoWaitValue32(int channel) {
-//---------------------------------------------------------------------------------
-
-	while(!fifoCheckValue32(FIFO_USER_01)) {
-		swiIntrWait(1,IRQ_FIFO_NOT_EMPTY);
-	}
-
+extern "C" {
+	bool nand_ReadSectors(sec_t sector, sec_t numSectors,void* buffer);
 }
+
+int menuTop = 8, statusTop = 15;
 
 //---------------------------------------------------------------------------------
 int saveToFile(const char *filename, u8 *buffer, size_t size) {
@@ -65,6 +59,7 @@ void dummy() {
 }
 
 char dirname[15] = "FW";
+char serial[13];
 
 //---------------------------------------------------------------------------------
 void backupFirmware() {
@@ -156,6 +151,43 @@ void backupWifi() {
 	}
 }
 
+//---------------------------------------------------------------------------------
+void backupNAND() {
+//---------------------------------------------------------------------------------
+
+	clearStatus();
+
+
+	if (!__dsimode) {
+		iprintf("Not a DSi!\n");
+	} else {
+
+		FILE *f = fopen("nand.bin", "wb");
+
+		if (NULL == f) {
+			iprintf("failure creating nand.bin\n");
+		} else {
+			iprintf("Writing %s/nand.bin\n\n", dirname );
+			size_t i;
+			size_t sectors = 128;
+			size_t blocks = (240 * 1024 * 1024) / (sectors * 512);
+			for (i=0; i < blocks; i++) {
+				if(!nand_ReadSectors(i * sectors,sectors,firmware_buffer)) {
+					iprintf("\nError reading NAND!\n");
+					break;
+				}
+				size_t written = fwrite(firmware_buffer, 1, 512 * sectors, f);
+				if(written != 512 * sectors) {
+					iprintf("\nError writing to SD!\n");
+					break;
+				}
+				iprintf("Block %d of %d\r", i+1, blocks);
+			}
+			fclose(f);
+		}
+	}
+
+}
 
 bool quitting = false;
 
@@ -170,6 +202,7 @@ struct menuItem mainMenu[] = {
 	{ "Dump Bios", backupBIOS } ,
 	{ "Backup User Settings", backupSettings } ,
 	{ "Backup Wifi Settings", backupWifi } ,
+	{ "Backup DSi NAND", backupNAND},
 /*
 	TODO
 
@@ -179,10 +212,12 @@ struct menuItem mainMenu[] = {
 */	{ "Exit", quit }
 };
 
+//---------------------------------------------------------------------------------
 void showMenu(menuItem menu[], int count) {
+//---------------------------------------------------------------------------------
 	int i;
 	for (i=0; i<count; i++ ) {
-		iprintf("\x1b[%d;5H%s", i + menuTop, menu[i].name); 
+		iprintf("\x1b[%d;5H%s", i + menuTop, menu[i].name);
 	}
 }
 
@@ -193,12 +228,12 @@ int main() {
 	defaultExceptionHandler();
 
 	consoleDemoInit();
-	
+
 	if (!fatInitDefault()) {
 		printf("FAT init failed!\n");
 	} else {
 
-		iprintf("Nintendo DS firmware tool %s\n",VERSION);
+		iprintf("DS(i) firmware tool %s\n",VERSION);
 
 		firmware_buffer = (u8 *)memalign(32,MAX_SIZE);
 
@@ -210,9 +245,10 @@ int main() {
 			sprintf(&dirname[2+(2*i)],"%02X",firmware_buffer[0x36+i]);
 			if (i < 5) printf(":");
 		}
-		
+
+
 		dirname[14] = 0;
-		
+
 		mkdir(dirname, 0777);
 		chdir(dirname);
 
@@ -220,17 +256,15 @@ int main() {
 
 		fwSize = userSettingsOffset + 512;
 
-		iprintf("\n%dK firmware\njedec id %X", fwSize/1024,readJEDEC());
+		iprintf("\n%dK flash, jedec %X", fwSize/1024,readJEDEC());
 
 		wifiOffset = userSettingsOffset - 1024;
 		wifiSize = 1024;
-	
+
 		if ( firmware_buffer[29] == 0x57 ) {
 			wifiOffset -= 1536;
 			wifiSize += 1536;
 		}
-
-		fwSize -= (wifiSize + 512);
 
 		int count = sizeof(mainMenu) / sizeof(menuItem);
 
