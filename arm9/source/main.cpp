@@ -9,10 +9,6 @@
 
 #define MAX_SIZE	(1*1024*1024)
 
-extern "C" {
-	bool nand_ReadSectors(sec_t sector, sec_t numSectors,void* buffer);
-}
-
 int menuTop = 8, statusTop = 15;
 
 //---------------------------------------------------------------------------------
@@ -170,7 +166,7 @@ void backupNAND() {
 			iprintf("Writing %s/nand.bin\n\n", dirname );
 			size_t i;
 			size_t sectors = 128;
-			size_t blocks = (240 * 1024 * 1024) / (sectors * 512);
+			size_t blocks = nand_GetSize() / sectors;
 			for (i=0; i < blocks; i++) {
 				if(!nand_ReadSectors(i * sectors,sectors,firmware_buffer)) {
 					iprintf("\nError reading NAND!\n");
@@ -256,7 +252,9 @@ int main() {
 
 		fwSize = userSettingsOffset + 512;
 
-		iprintf("\n%dK flash, jedec %X", fwSize/1024,readJEDEC());
+		iprintf("\n%dK flash, jedec %X\n", fwSize/1024,readJEDEC());
+
+		iprintf("NAND size %d sectors\n",nand_GetSize());
 
 		wifiOffset = userSettingsOffset - 1024;
 		wifiSize = 1024;
