@@ -82,7 +82,7 @@ void backupBIOS() {
 	const char *arm7file, *arm9file;
 	size_t arm7size, arm9size;
 
-	if (__dsimode) {
+	if (isDSiMode()) {
 		arm7file = "bios7i.bin";
 		arm7size = 64 * 1024;
 		arm9file = "bios9i.bin";
@@ -154,7 +154,7 @@ void backupNAND() {
 	clearStatus();
 
 
-	if (!__dsimode) {
+	if (!isDSiMode()) {
 		iprintf("Not a DSi!\n");
 	} else {
 
