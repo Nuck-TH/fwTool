@@ -14,7 +14,7 @@
 
 extern "C" {
 	bool nand_ReadSectors(sec_t sector, sec_t numSectors,void* buffer);
-	bool nand_WriteSectors(sec_t sector, sec_t numSectors,void* buffer); //!!!
+	bool nand_WriteSectors(sec_t sector, sec_t numSectors,const void* buffer); //!!!
 }
 
 int menuTop = 5, statusTop = 18;
@@ -228,54 +228,92 @@ void restoreNAND() {
 
 	if (!isDSiMode()) {
 		iprintf("Not a DSi or 3ds!\n");
-	} else {
-		
-		iprintf("Sure? NAND restore is DANGEROUS!");
-		iprintf("START + SELECT confirm\n");
-		iprintf("B to exit\n");
-		
-		while(1){
-		    scanKeys();
-			int keys = keysHeld();
-			if((keys & KEY_START) && (keys & KEY_SELECT))break;
-			if(keys & KEY_B){
-				clearStatus();
-				return;
-			}
-			swiWaitForVBlank();
-		}
-		
-		clearStatus();
-	
-		FILE *f = fopen(nand_type, "rb");
-
-		if (NULL == f) {
-			iprintf("failure creating %s\n", nand_type);
-		} else {
-			iprintf("Reading %s/%s\n\n", dirname, nand_type);
-			size_t i;
-			size_t sectors = 128;
-			size_t blocks = (sizMB * 1024 * 1024) / (sectors * 512);
-			for (i=0; i < blocks; i++) {
-				
-				size_t read = fread(firmware_buffer, 1, 512 * sectors, f);
-				
-				if(read != 512 * sectors) {
-					iprintf("\nError reading SD!\n");
-					break;
-				}
-				
-				if(!nand_WriteSectors(i * sectors,sectors,firmware_buffer)) {
-					iprintf("\nError writing NAND!\n");
-					break;
-				}
-				
-				iprintf("%d/%d DON'T poweroff!\r", i+1, blocks);
-			}
-			fclose(f);
-		}
+		return;
 	}
-
+	
+	FILE *f = fopen(nand_type, "rb");
+	
+	if (f == NULL) {
+		iprintf("Failure opening %s\n", nand_type);
+		return;
+	}
+	
+	//Sanity checks
+	//	Size check
+	fseek(f, 0, SEEK_END);
+	size_t dump_size = ftell(f);
+	if ( dump_size != (sizMB * 1024 * 1024) ) {
+		iprintf("%s and NAND sizes\ndo not match.\nOperation aborted.", nand_type);
+		fclose(f);
+		return;
+	}
+	rewind(f);
+	//	MBR(decrypted image) check
+	//	Taken from TWLtool (https://github.com/WinterMute/twltool)
+	struct {
+		u8 code[446];
+		struct {
+			u8  status;
+			u8  start_chs[3];
+			u8  partition_type;
+			u8  end_chs[3];
+			u32 start_sector;
+			u32 num_sectors;
+		} __attribute__((__packed__)) partition[4];
+		u8 signature[2];
+	} mbr;
+    fread(&mbr, 1, 0x200, f);
+    if(mbr.signature[0] == 0x55 || mbr.signature[1] == 0xAA) {
+		iprintf("Found MBR in %s.\nImage is not encrypted.\nOperation aborted.", nand_type);
+		fclose(f);
+		return;
+	}
+	rewind(f);
+	//Sanity checks end
+	
+	iprintf("Sure? NAND restore is DANGEROUS!");
+	iprintf("START + SELECT confirm\n");
+	iprintf("B to cancel\n");
+	
+	while (1) {
+	    scanKeys();
+		int keys = keysHeld();
+		if ((keys & KEY_START) && (keys & KEY_SELECT))break;
+		if (keys & KEY_B) {
+			clearStatus();
+			fclose(f);
+			return;
+		}
+		swiWaitForVBlank();
+	}
+	
+	clearStatus();
+	
+	iprintf("Reading %s/%s\n\n", dirname, nand_type);
+	size_t i;
+	size_t sectors = 128;
+	size_t blocks = (sizMB * 1024 * 1024) / (sectors * 512);
+	for (i=0; i < blocks; i++) {
+		
+		size_t read = fread(firmware_buffer, 1, 512 * sectors, f);
+		
+		if(read != 512 * sectors) {
+			iprintf("\nError reading SD!\n");
+			break;
+		}
+		
+		if(!nand_WriteSectors(i * sectors,sectors,firmware_buffer)) {
+			iprintf("\nError writing NAND!\n");
+			break;
+		}
+		
+		iprintf("%d/%d DON'T poweroff!\r", i+1, blocks);
+	}
+	fclose(f);
+	
+	clearStatus();
+	iprintf("Restore %s success.\nYou may now Exit and restart\nyour console.",nand_type);
+	
 }
 
 void dumpCID(){

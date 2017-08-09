@@ -10,7 +10,7 @@ include $(DEVKITARM)/ds_rules
 export TARGET	:=	fwTool
 export TOPDIR	:=	$(CURDIR)
 
-export VERSION	:=	1.4.2
+export VERSION	:=	1.6.1
 
 .PHONY: arm7/$(TARGET).elf arm9/$(TARGET).elf
 
