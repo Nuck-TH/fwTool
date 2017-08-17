@@ -247,6 +247,7 @@ void restoreNAND() {
 	}
 	
 	//Sanity checks
+	
 	//	Size check
 	fseek(f, 0, SEEK_END);
 	size_t dump_size = ftell(f);
@@ -255,7 +256,20 @@ void restoreNAND() {
 		fclose(f);
 		return;
 	}
+	//	NO$GBA footer check in image of normal size
+	//	yes, that works in emulator
+	fseek(f, -64, SEEK_CUR);
+	char ngsign[] = "DSi eMMC CID/CPU\0";
+	char fsign[17];
+	fsign[16] = '\0';
+	fread(fsign, 1, 16, f);
+	if ( !strcmp(ngsign, fsign) ) {
+		iprintf("%s has NO$GBA footer\nthat replaces end of image!\nOperation aborted.", nand_type);
+		fclose(f);
+		return;
+	}	
 	rewind(f);
+	
 	//	MBR(decrypted image) check
 	//	Taken from TWLtool (https://github.com/WinterMute/twltool)
 	struct {
@@ -277,6 +291,17 @@ void restoreNAND() {
 		return;
 	}
 	rewind(f);
+	
+	//	Battery level/charger check
+	u32 pwrReg = getBatteryLevel();
+	bool isCharging = (pwrReg >> 7) & 1;
+	int batLevel = pwrReg & 0b1111;
+	
+	if ( !isCharging && (batLevel < 7) ) {
+		iprintf("Battery level below 50%%(2 bars)\nPlease connect charger.\nOperation aborted.");
+		fclose(f);
+		return;
+	}
 	//Sanity checks end
 	
 	iprintf("Sure? NAND restore is DANGEROUS!");
@@ -297,7 +322,13 @@ void restoreNAND() {
 	
 	clearStatus();
 	
-	iprintf("Reading %s/%s\n\n", dirname, nand_type);
+	if (isCharging) {
+		iprintf("DON'T poweroff console\nor disconnect charger!\n");
+	} else {
+		iprintf("DON'T poweroff console!\n");
+	}
+	
+	iprintf("Reading:\n%s/%s\n", dirname, nand_type);
 	size_t i;
 	size_t sectors = 128;
 	size_t blocks = (sizMB * 1024 * 1024) / (sectors * 512);
@@ -315,7 +346,7 @@ void restoreNAND() {
 			break;
 		}
 		
-		iprintf("%d/%d DON'T poweroff!\r", i+1, blocks);
+		iprintf("Progress: %d/%d blocks\r", i+1, blocks);
 	}
 	fclose(f);
 	
