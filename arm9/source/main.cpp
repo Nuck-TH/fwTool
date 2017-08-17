@@ -17,6 +17,14 @@ extern "C" {
 	bool nand_WriteSectors(sec_t sector, sec_t numSectors,const void* buffer); //!!!
 }
 
+//Declaration for building with libnds < 1.6.0
+#if _LIBNDS_MINOR_ < 6
+static inline bool isDSiMode() {
+	extern bool __dsimode;
+	return __dsimode;
+}
+#endif
+
 int menuTop = 5, statusTop = 18;
 
 //---------------------------------------------------------------------------------
